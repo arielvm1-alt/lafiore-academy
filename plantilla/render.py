@@ -1,0 +1,178 @@
+# -*- coding: utf-8 -*-
+"""
+Render de las laminas con Chromium (Playwright) + control de calidad.
+
+Uso:
+    python plantilla/render.py            # renderiza los 10 sets
+    python plantilla/render.py 1          # solo el set 01
+    python plantilla/render.py 1 3 7      # sets sueltos
+
+Salida: salida/set_NN/01_portada.jpg ... 06_cierre.jpg  (1080x1350, JPG q95)
+        salida/captions.json
+"""
+
+import io
+import json
+import os
+import sys
+import tempfile
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "contenido"))
+
+from PIL import Image
+from playwright.sync_api import sync_playwright
+
+import plantilla
+import sets as contenido
+import captions as textos_caption
+
+RAIZ = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+SALIDA = os.path.join(RAIZ, "salida")
+
+# La consola de Windows usa cp1252 y rompe con emojis y tildes: forzamos UTF-8.
+try:
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+except Exception:
+    pass
+
+
+ESCALA = 2          # se renderiza a 2x y se reduce -> bordes mas limpios
+CALIDAD = 95
+
+
+# --------------------------------------------------------------------------
+# control de calidad dentro de la pagina
+# --------------------------------------------------------------------------
+
+QC_JS = r"""
+() => {
+  const problemas = [];
+  const lamina = document.querySelector('.lamina');
+  const caja = lamina.getBoundingClientRect();
+
+  // 1. la lamina no debe tener scroll (contenido fuera de 1080x1350)
+  if (lamina.scrollHeight > lamina.clientHeight + 1)
+    problemas.push(`la lamina desborda en alto: ${lamina.scrollHeight} > ${lamina.clientHeight}`);
+  if (lamina.scrollWidth > lamina.clientWidth + 1)
+    problemas.push(`la lamina desborda en ancho: ${lamina.scrollWidth} > ${lamina.clientWidth}`);
+
+  // 2. nada puede invadir el pie
+  const pie = document.querySelector('.pie');
+  if (pie) {
+    const topePie = pie.getBoundingClientRect().top;
+    for (const sel of ['.filas', '.banda', '.cierre-centro', '.titulo', '.antetitulo']) {
+      const el = document.querySelector(sel);
+      if (!el) continue;
+      const b = el.getBoundingClientRect().bottom;
+      if (b > topePie + 1)
+        problemas.push(`${sel} invade el pie por ${(b - topePie).toFixed(1)}px`);
+    }
+  }
+
+  // 3. ningun texto puede salirse de su caja ni de la lamina
+  const textos = document.querySelectorAll(
+    '.cuerpo, .frase-lineas > div, .titulo, .antetitulo, .portada-titulo, ' +
+    '.portada-sub, .banda .cta, .banda .guarda, .masthead .marca, .etiqueta, .pie-txt, .pie-der');
+  for (const el of textos) {
+    if (el.scrollWidth > el.clientWidth + 1)
+      problemas.push(`texto desbordado (${el.className || el.tagName}): "${el.textContent.trim().slice(0, 40)}"`);
+    const r = el.getBoundingClientRect();
+    if (r.right > caja.right + 1 || r.left < caja.left - 1 || r.bottom > caja.bottom + 1)
+      problemas.push(`texto fuera de lamina: "${el.textContent.trim().slice(0, 40)}"`);
+  }
+
+  // 4. cada linea de FRASE debe caber en un solo renglon
+  for (const el of document.querySelectorAll('.frase-lineas > div')) {
+    const lh = parseFloat(getComputedStyle(el).lineHeight);
+    if (el.offsetHeight > lh * 1.5)
+      problemas.push(`frase partida en dos renglones: "${el.textContent.trim()}"`);
+  }
+
+  // 5. las ilustraciones deben caber en su columna
+  for (const el of document.querySelectorAll('.ilu-col')) {
+    if (el.getBoundingClientRect().height > 173)
+      problemas.push('ilustracion mas alta que 172px');
+  }
+
+  return problemas;
+}
+"""
+
+
+# --------------------------------------------------------------------------
+
+def _guardar_jpg(png_bytes, destino):
+    im = Image.open(io.BytesIO(png_bytes)).convert("RGB")
+    if im.size != (plantilla.ANCHO, plantilla.ALTO):
+        im = im.resize((plantilla.ANCHO, plantilla.ALTO), Image.LANCZOS)
+    im.save(destino, "JPEG", quality=CALIDAD, subsampling=0, optimize=True, progressive=True)
+    return im.size
+
+
+def render_sets(ids=None):
+    errores_copy = contenido.validar()
+    if errores_copy:
+        print("Contenido con problemas:")
+        for e in errores_copy:
+            print("  -", e)
+        return 1
+
+    objetivo = [s for s in contenido.SETS if ids is None or s["id"] in ids]
+    fallos = []
+    generados = 0
+
+    tmp = tempfile.mkdtemp(prefix="lafiore_")
+
+    with sync_playwright() as pw:
+        navegador = pw.chromium.launch()
+        pagina = navegador.new_page(
+            viewport={"width": plantilla.ANCHO, "height": plantilla.ALTO},
+            device_scale_factor=ESCALA,
+        )
+        for s in objetivo:
+            carpeta = os.path.join(SALIDA, "set_%02d" % s["id"])
+            os.makedirs(carpeta, exist_ok=True)
+            print("SET %02d · vol. %s · %s" % (s["id"], s["vol"], s["publico"]))
+
+            for nombre, html in plantilla.laminas(s):
+                ruta_html = os.path.join(tmp, "set%02d_%s.html" % (s["id"], nombre))
+                with open(ruta_html, "w", encoding="utf-8") as f:
+                    f.write(html)
+                pagina.goto("file:///" + ruta_html.replace("\\", "/"))
+                pagina.wait_for_timeout(120)
+
+                problemas = pagina.evaluate(QC_JS)
+                etiqueta = "set_%02d/%s" % (s["id"], nombre)
+                for p in problemas:
+                    fallos.append("%s -> %s" % (etiqueta, p))
+
+                destino = os.path.join(carpeta, nombre + ".jpg")
+                png = pagina.locator(".lamina").screenshot(type="png")
+                tam = _guardar_jpg(png, destino)
+                generados += 1
+                estado = "OK " if not problemas else "QC!"
+                print("   %s %s  %dx%d  %d KB" % (
+                    estado, nombre, tam[0], tam[1], os.path.getsize(destino) // 1024))
+
+        navegador.close()
+
+    # captions
+    os.makedirs(SALIDA, exist_ok=True)
+    with open(os.path.join(SALIDA, "captions.json"), "w", encoding="utf-8") as f:
+        json.dump(textos_caption.captions(), f, ensure_ascii=False, indent=2)
+
+    print("\n%d laminas generadas." % generados)
+    if fallos:
+        print("\nCONTROL DE CALIDAD - %d problema(s):" % len(fallos))
+        for f_ in fallos:
+            print("  -", f_)
+        return 2
+    print("Control de calidad: sin desbordes.")
+    return 0
+
+
+if __name__ == "__main__":
+    ids = [int(a) for a in sys.argv[1:]] or None
+    sys.exit(render_sets(ids))

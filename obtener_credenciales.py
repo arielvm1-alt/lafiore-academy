@@ -100,6 +100,39 @@ def main():
     if not app_secret or not token_corto:
         raise SystemExit("Faltan datos. No se hizo nada.")
 
+    # --- diagnostico: los dos valores tienen formas muy distintas -----------
+    def parece_token(v):
+        return len(v) > 60 or v[:2].upper() == "EA"
+
+    def parece_secreto(v):
+        return len(v) == 32 and all(c in "0123456789abcdefABCDEF" for c in v)
+
+    print("\nRevisando lo que pegaste (sin mostrarlo):")
+    print("   clave: %d caracteres%s" % (
+        len(app_secret), "" if parece_secreto(app_secret) else "   <- no parece una clave"))
+    print("   token: %d caracteres%s" % (
+        len(token_corto), "" if parece_token(token_corto) else "   <- no parece un token"))
+
+    if parece_token(app_secret) and parece_secreto(token_corto):
+        print("\n   Los pegaste al reves. Los intercambio y sigo.")
+        app_secret, token_corto = token_corto, app_secret
+    elif not parece_secreto(app_secret):
+        raise SystemExit(
+            "\nLa clave secreta de la app son exactamente 32 caracteres hexadecimales\n"
+            "(solo 0-9 y a-f), y lo que pegaste tiene %d.\n\n"
+            "Sacala de aqui, del campo 'Clave secreta de la app', pulsando Mostrar:\n"
+            "  https://developers.facebook.com/apps/%s/settings/basic/\n\n"
+            "Copiala con doble clic para no arrastrar espacios ni cortarla."
+            % (len(app_secret), APP_ID))
+
+    # --- comprobar la clave por separado, antes de tocar el token ----------
+    print("\nComprobando solo la clave de la app...")
+    _get("oauth/access_token",
+         grant_type="client_credentials",
+         client_id=APP_ID,
+         client_secret=app_secret)
+    print("   OK, la clave es correcta.")
+
     print("\nCambiando el token por el de 60 dias...")
     r = _get("oauth/access_token",
              grant_type="fb_exchange_token",

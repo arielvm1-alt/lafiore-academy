@@ -16,7 +16,7 @@ Variables de entorno necesarias:
     IG_ACCESS_TOKEN  token de larga duracion
     IG_BASE_URL      URL publica donde viven las imagenes, sin barra final.
                      Ej: https://raw.githubusercontent.com/USUARIO/lafiore-academy/main/salida
-    IG_API_VERSION   opcional, por defecto v23.0
+    IG_API_VERSION   opcional, por defecto v26.0
 
 Sin dependencias externas: solo biblioteca estandar.
 """
@@ -69,7 +69,7 @@ def config():
         "user_id": os.environ["IG_USER_ID"].strip(),
         "token": os.environ["IG_ACCESS_TOKEN"].strip(),
         "base_url": os.environ["IG_BASE_URL"].strip().rstrip("/"),
-        "version": os.environ.get("IG_API_VERSION", "v23.0").strip(),
+        "version": os.environ.get("IG_API_VERSION", "v26.0").strip(),
     }
 
 

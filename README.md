@@ -99,20 +99,20 @@ Sin este vínculo la API no funciona. Es el paso que más se olvida.
 3. Ese token dura 1 hora. Para conseguir el de 60 días, ejecuta:
 
    ```bash
-   curl -s "https://graph.facebook.com/v23.0/oauth/access_token?grant_type=fb_exchange_token&client_id=TU_APP_ID&client_secret=TU_APP_SECRET&fb_exchange_token=EL_TOKEN_CORTO"
+   curl -s "https://graph.facebook.com/v26.0/oauth/access_token?grant_type=fb_exchange_token&client_id=TU_APP_ID&client_secret=TU_APP_SECRET&fb_exchange_token=EL_TOKEN_CORTO"
    ```
 
    El `access_token` que devuelve es el bueno: **guárdalo**.
 4. Con ese token, saca el id de la cuenta de Instagram:
 
    ```bash
-   curl -s "https://graph.facebook.com/v23.0/me/accounts?access_token=EL_TOKEN_LARGO"
+   curl -s "https://graph.facebook.com/v26.0/me/accounts?access_token=EL_TOKEN_LARGO"
    ```
 
    Copia el `id` de tu página y pídele su cuenta de Instagram:
 
    ```bash
-   curl -s "https://graph.facebook.com/v23.0/ID_DE_LA_PAGINA?fields=instagram_business_account&access_token=EL_TOKEN_LARGO"
+   curl -s "https://graph.facebook.com/v26.0/ID_DE_LA_PAGINA?fields=instagram_business_account&access_token=EL_TOKEN_LARGO"
    ```
 
    El número que sale en `instagram_business_account` es tu **`IG_USER_ID`**.
@@ -198,7 +198,7 @@ Ponte un recordatorio para el día 50. El token largo se renueva a partir de
 sí mismo:
 
 ```bash
-curl -s "https://graph.facebook.com/v23.0/oauth/access_token?grant_type=fb_exchange_token&client_id=TU_APP_ID&client_secret=TU_APP_SECRET&fb_exchange_token=EL_TOKEN_ACTUAL"
+curl -s "https://graph.facebook.com/v26.0/oauth/access_token?grant_type=fb_exchange_token&client_id=TU_APP_ID&client_secret=TU_APP_SECRET&fb_exchange_token=EL_TOKEN_ACTUAL"
 ```
 
 Pega el nuevo valor en el secreto `IG_ACCESS_TOKEN`. Nada más.

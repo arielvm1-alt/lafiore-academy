@@ -4,9 +4,9 @@
   "sets": [
     {
       "set": "set_01",
-      "estado": "pendiente",
-      "publicado_en": null,
-      "media_id": null,
+      "estado": "publicado",
+      "publicado_en": "2026-08-24T20:12:07+0000",
+      "media_id": "18576979720068948",
       "intentos": 0
     },
     {

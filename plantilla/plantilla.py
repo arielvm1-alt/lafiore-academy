@@ -20,7 +20,8 @@ FUENTES = os.path.join(ASSETS, "fonts")
 ANCHO, ALTO = 1080, 1350
 
 # ---- identidad -----------------------------------------------------------
-VERDE_OSCURO = "#1E3A2E"
+VERDE_OSCURO = "#1E3A2E"      # flecha de portada y arte del sello invertido
+VERDE_PORTADA = "#32614C"     # fondo de portada: verde exacto del sello corporativo
 VERDE_CLARO = "#32614D"
 CREMA = "#F4EFE3"
 DORADO = "#C2A15B"
@@ -122,7 +123,7 @@ body { -webkit-font-smoothing:antialiased; text-rendering:geometricPrecision; }
 .capa { position:relative; z-index:1; display:flex; flex-direction:column; height:100%%; }
 
 /* ------------------------------------------------------------ PORTADA */
-.portada { background:%(verde_oscuro)s; padding:70px 66px; }
+.portada { background:%(verde_portada)s; padding:70px 66px; }
 .kicker {
   font-family:Poppins; font-weight:600; font-size:23px; letter-spacing:.30em;
   color:%(dorado)s; text-transform:uppercase;
@@ -246,7 +247,8 @@ body { -webkit-font-smoothing:antialiased; text-rendering:geometricPrecision; }
         "poppins_medium": a["poppins_medium"], "poppins_semibold": a["poppins_semibold"],
         "poppins_bold": a["poppins_bold"],
         "grano": GRANO, "ancho": ANCHO, "alto": ALTO,
-        "verde_oscuro": VERDE_OSCURO, "verde_claro": VERDE_CLARO,
+        "verde_oscuro": VERDE_OSCURO, "verde_portada": VERDE_PORTADA,
+        "verde_claro": VERDE_CLARO,
         "crema": CREMA, "dorado": DORADO, "tinta": TINTA,
     }
 

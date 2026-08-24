@@ -16,6 +16,10 @@ on:
         description: 'Solo simular, sin llamar a la API'
         type: boolean
         default: false
+      verificar:
+        description: 'Solo comprobar token, cuenta y cuota. No publica nada.'
+        type: boolean
+        default: false
 
 concurrency:
   group: publicar-instagram
@@ -52,6 +56,9 @@ jobs:
           fi
           if [ "${{ github.event.inputs.dry_run }}" = "true" ]; then
             ARGS="$ARGS --dry-run"
+          fi
+          if [ "${{ github.event.inputs.verificar }}" = "true" ]; then
+            ARGS="--verificar"
           fi
           python publicar.py $ARGS 2>&1 | tee salida_publicacion.txt
 

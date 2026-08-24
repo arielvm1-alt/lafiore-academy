@@ -18,6 +18,7 @@ ASSETS = os.path.join(RAIZ, "assets")
 FUENTES = os.path.join(ASSETS, "fonts")
 
 ANCHO, ALTO = 1080, 1350
+ALTO_HISTORIA = 1920          # las historias son 9:16
 
 # ---- identidad -----------------------------------------------------------
 VERDE_OSCURO = "#1E3A2E"      # flecha de portada y arte del sello invertido
@@ -150,6 +151,8 @@ body { -webkit-font-smoothing:antialiased; text-rendering:geometricPrecision; }
   font-family:Poppins; font-weight:600; font-size:24px; letter-spacing:.24em; color:%(dorado)s;
 }
 .logo-portada { height:110px; width:auto; display:block; }
+/* en historias, Instagram superpone su interfaz arriba y abajo */
+.lamina.historia .portada { padding:250px 66px 270px; }
 
 /* ----------------------------------------------------------- INTERIOR */
 .interior { background:%(crema)s; padding:50px 54px; color:%(tinta)s; }
@@ -257,12 +260,15 @@ body { -webkit-font-smoothing:antialiased; text-rendering:geometricPrecision; }
 # bloques
 # --------------------------------------------------------------------------
 
-def _documento(clase, contenido):
+def _documento(clase, contenido, alto=ALTO):
+    extra = ""
+    if alto != ALTO:
+        extra = "<style>html,body,.lamina{height:%dpx;}</style>" % alto
     return (
         "<!doctype html><html lang='es'><head><meta charset='utf-8'>"
-        "<style>%s</style></head><body>"
+        "<style>%s</style>%s</head><body>"
         "<div class='lamina %s'><div class='capa'>%s</div><div class='grano'></div></div>"
-        "</body></html>" % (css(), clase, contenido)
+        "</body></html>" % (css(), extra, clase, contenido)
     )
 
 
@@ -314,7 +320,7 @@ def _fila_frase(a_txt, b_txt):
 # laminas
 # --------------------------------------------------------------------------
 
-def portada(s):
+def _cuerpo_portada(s, cta="DESLIZA"):
     a = assets()
     contenido = (
         "<div><div class='kicker'>La Fiore Academy · Formación profesional</div>"
@@ -323,11 +329,21 @@ def portada(s):
         "<h1 class='portada-titulo'>%s</h1>"
         "<p class='portada-sub'>%s</p></div>"
         "<div class='portada-pie'>"
-        "<div class='desliza'><div class='circulo'>&#8594;</div><div class='txt'>DESLIZA</div></div>"
+        "<div class='desliza'><div class='circulo'>&#8594;</div><div class='txt'>%s</div></div>"
         "<img class='logo-portada' src='%s' alt=''></div>"
-        % (marcar(s["portada"]["titulo"]), marcar(s["portada"]["sub"]), a["logo_blanco"])
+        % (marcar(s["portada"]["titulo"]), marcar(s["portada"]["sub"]), cta, a["logo_blanco"])
     )
-    return _documento("portada", contenido)
+    return contenido
+
+
+def portada(s):
+    return _documento("portada", _cuerpo_portada(s))
+
+
+def historia(s):
+    """Misma portada en 1080x1920 para publicar como historia."""
+    return _documento("portada historia",
+                      _cuerpo_portada(s, "EN EL PERFIL"), ALTO_HISTORIA)
 
 
 def interior(s, indice):

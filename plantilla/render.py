@@ -103,10 +103,11 @@ QC_JS = r"""
 
 # --------------------------------------------------------------------------
 
-def _guardar_jpg(png_bytes, destino):
+def _guardar_jpg(png_bytes, destino, tamano=None):
+    tamano = tamano or (plantilla.ANCHO, plantilla.ALTO)
     im = Image.open(io.BytesIO(png_bytes)).convert("RGB")
-    if im.size != (plantilla.ANCHO, plantilla.ALTO):
-        im = im.resize((plantilla.ANCHO, plantilla.ALTO), Image.LANCZOS)
+    if im.size != tamano:
+        im = im.resize(tamano, Image.LANCZOS)
     im.save(destino, "JPEG", quality=CALIDAD, subsampling=0, optimize=True, progressive=True)
     return im.size
 
@@ -129,6 +130,10 @@ def render_sets(ids=None):
         navegador = pw.chromium.launch()
         pagina = navegador.new_page(
             viewport={"width": plantilla.ANCHO, "height": plantilla.ALTO},
+            device_scale_factor=ESCALA,
+        )
+        pagina_historia = navegador.new_page(
+            viewport={"width": plantilla.ANCHO, "height": plantilla.ALTO_HISTORIA},
             device_scale_factor=ESCALA,
         )
         for s in objetivo:
@@ -155,6 +160,21 @@ def render_sets(ids=None):
                 estado = "OK " if not problemas else "QC!"
                 print("   %s %s  %dx%d  %d KB" % (
                     estado, nombre, tam[0], tam[1], os.path.getsize(destino) // 1024))
+
+            # historia 1080x1920 a partir de la portada
+            ruta_html = os.path.join(tmp, "set%02d_historia.html" % s["id"])
+            with open(ruta_html, "w", encoding="utf-8") as f:
+                f.write(plantilla.historia(s))
+            pagina_historia.goto("file:///" + ruta_html.replace("\\", "/"))
+            pagina_historia.wait_for_timeout(120)
+            for pr in pagina_historia.evaluate(QC_JS):
+                fallos.append("set_%02d/historia -> %s" % (s["id"], pr))
+            destino = os.path.join(carpeta, "historia.jpg")
+            png = pagina_historia.locator(".lamina").screenshot(type="png")
+            tam = _guardar_jpg(png, destino, (plantilla.ANCHO, plantilla.ALTO_HISTORIA))
+            generados += 1
+            print("   OK  historia    %dx%d  %d KB" % (
+                tam[0], tam[1], os.path.getsize(destino) // 1024))
 
         navegador.close()
 

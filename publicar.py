@@ -44,6 +44,7 @@ except Exception:
 
 
 LAMINAS = ["01_portada", "02_pagina", "03_pagina", "04_pagina", "05_pagina", "06_cierre"]
+HISTORIA = "historia"      # 1080x1920, se publica como historia tras el carrusel
 
 REINTENTOS = 4
 ESPERA_BASE = 5           # segundos; se duplica en cada reintento
@@ -238,7 +239,29 @@ def publicar_contenedor(cfg, creation_id):
     return _con_reintento("publicar el carrusel", hacer)["id"]
 
 
-def publicar_set(cfg, nombre_set, dry_run=False):
+def publicar_historia(cfg, nombre_set):
+    """Sube la portada 9:16 como historia. Devuelve el media_id o None."""
+    local = os.path.join(SALIDA, nombre_set, HISTORIA + ".jpg")
+    if not os.path.exists(local):
+        print("   (sin historia.jpg, me la salto)")
+        return None
+    url = "%s/%s/%s.jpg" % (cfg["base_url"], nombre_set, HISTORIA)
+
+    def crear():
+        return _peticion(_api(cfg, "%s/media" % cfg["user_id"]), {
+            "image_url": url,
+            "media_type": "STORIES",
+            "access_token": cfg["token"],
+        })
+
+    creation_id = _con_reintento("crear la historia", crear)["id"]
+    esperar_listo(cfg, creation_id)
+    media_id = publicar_contenedor(cfg, creation_id)
+    print("   HISTORIA PUBLICADA. media_id = %s" % media_id)
+    return media_id
+
+
+def publicar_set(cfg, nombre_set, dry_run=False, sin_historia=False):
     caption = caption_de(nombre_set)
     urls = urls_de(cfg, nombre_set)
 
@@ -247,9 +270,12 @@ def publicar_set(cfg, nombre_set, dry_run=False):
         print("   -", u)
     print("Caption:\n%s\n" % "\n".join("   | " + l for l in caption.split("\n")))
 
+    if not sin_historia:
+        print("Historia: %s/%s/%s.jpg" % (cfg["base_url"], nombre_set, HISTORIA))
+
     if dry_run:
         print("[dry-run] no se llamo a la API.")
-        return None
+        return None, None
 
     usadas = cuota(cfg)
     if usadas is not None:
@@ -270,7 +296,16 @@ def publicar_set(cfg, nombre_set, dry_run=False):
 
     media_id = publicar_contenedor(cfg, contenedor)
     print("   PUBLICADO. media_id = %s" % media_id)
-    return media_id
+
+    historia_id = None
+    if not sin_historia:
+        print("\nPublicando la historia...")
+        try:
+            historia_id = publicar_historia(cfg, nombre_set)
+        except ErrorPublicacion as e:
+            # el carrusel ya esta publicado: la historia no debe tumbar la ejecucion
+            print("   ! la historia fallo: %s" % e)
+    return media_id, historia_id
 
 
 # --------------------------------------------------------------------------
@@ -340,7 +375,8 @@ def cmd_publicar(args):
 
     cfg = config()
     try:
-        media_id = publicar_set(cfg, entrada["set"], dry_run=args.dry_run)
+        media_id, historia_id = publicar_set(
+            cfg, entrada["set"], dry_run=args.dry_run, sin_historia=args.sin_historia)
     except ErrorPublicacion:
         if not args.dry_run:
             entrada["estado"] = "error"
@@ -351,6 +387,7 @@ def cmd_publicar(args):
     if not args.dry_run:
         entrada["estado"] = "publicado"
         entrada["media_id"] = media_id
+        entrada["historia_media_id"] = historia_id
         entrada["publicado_en"] = time.strftime("%Y-%m-%dT%H:%M:%S%z")
         guardar_estado(estado)
     return 0
@@ -360,6 +397,8 @@ def main():
     p = argparse.ArgumentParser(description="Publica un carrusel de La Fiore Academy en Instagram.")
     p.add_argument("--set", type=int, help="numero de set a publicar (1-10)")
     p.add_argument("--dry-run", action="store_true", help="no llama a la API")
+    p.add_argument("--sin-historia", action="store_true",
+                   help="publica solo el carrusel, sin la historia")
     p.add_argument("--verificar", action="store_true", help="comprueba token, cuenta y cuota")
     p.add_argument("--estado", action="store_true", help="muestra el calendario de publicacion")
     p.add_argument("--iniciar", action="store_true", help="crea estado.json desde cero")

@@ -174,12 +174,17 @@ python publicar.py --estado   # ver qué se publicó y qué falta
 
 ## 4. El cron diario
 
-`.github/workflows/publicar.yml` publica **un set por día a las 12:00 de Chile**.
+`.github/workflows/publicar.yml` publica **un set los lunes y los miércoles a las
+12:00 de Chile**. Con 10 sets, eso cubre cinco semanas.
 
 Como Chile cambia de hora dos veces al año, el cron se lanza a las 15:00 y a
 las 16:00 UTC, y el script comprueba la hora real en Santiago: publica en la
 ejecución correcta e ignora la otra. No hay que tocar nada en marzo ni en
 septiembre.
+
+Para cambiar los días, edita las dos líneas `cron` del workflow: `1,3` son
+lunes y miércoles (0 = domingo). `1-5` serían todos los días laborables y `*`
+todos los días.
 
 Al terminar, guarda el resultado en `estado.json` y lo sube al repositorio.
 Si algo falla, reintenta con esperas crecientes y, si aun así no lo consigue,

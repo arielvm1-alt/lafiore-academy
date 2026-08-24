@@ -1,6 +1,6 @@
 {
   "zona_horaria": "America/Santiago",
-  "orden": "un set por dia, 12:00 hora de Chile",
+  "orden": "un set por lunes y miercoles, 12:00 hora de Chile",
   "sets": [
     {
       "set": "set_01",

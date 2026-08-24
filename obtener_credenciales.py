@@ -56,7 +56,21 @@ def _get(ruta, **params):
             detalle = json.loads(detalle)["error"]["message"]
         except Exception:
             pass
-        raise SystemExit("\nERROR de la API: %s" % detalle)
+        pista = ""
+        bajo = detalle.lower()
+        if "client secret" in bajo:
+            pista = (
+                "\n\nEsa clave no es la de esta app. Hay DOS claves distintas y se confunden:\n"
+                "  - La que necesitas aqui: Configuracion de la app -> Basica ->\n"
+                "    'Clave secreta de la app'  (pulsa Mostrar y copiala entera)\n"
+                "    https://developers.facebook.com/apps/%s/settings/basic/\n"
+                "  - La que NO sirve: la 'Clave secreta de la app de Instagram',\n"
+                "    que sale en la pantalla del producto Instagram.\n"
+                "Vuelve a ejecutar el script con la primera." % APP_ID)
+        elif "expired" in bajo or "session" in bajo:
+            pista = ("\n\nEl token corto del Explorador dura 1 hora. Genera uno nuevo\n"
+                     "y vuelve a ejecutar el script.")
+        raise SystemExit("\nERROR de la API: %s%s" % (detalle, pista))
     except urllib.error.URLError as e:
         raise SystemExit("\nERROR de conexion: %s" % e.reason)
 

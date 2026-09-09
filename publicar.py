@@ -342,25 +342,57 @@ def cmd_estado():
     return 0
 
 
-def hora_chilena_correcta(objetivo=12):
-    """True si en Santiago son las <objetivo> h. Evita depender del horario de verano."""
+DIAS_PUBLICACION = (0, 2)      # lunes y miercoles
+VENTANA_DESDE = 12             # hora de Chile a partir de la cual se puede publicar
+VENTANA_HASTA = 21             # y hasta la cual; mas tarde ya no vale la pena
+
+
+def ahora_en_chile():
+    from datetime import datetime
+    from zoneinfo import ZoneInfo
+    return datetime.now(ZoneInfo("America/Santiago"))
+
+
+def toca_publicar(estado, desde=VENTANA_DESDE, hasta=VENTANA_HASTA):
+    """
+    Decide si esta ejecucion debe publicar.
+
+    Los cron de GitHub Actions se retrasan de forma impredecible: se han visto
+    retrasos de mas de tres horas. Por eso no se compara con una hora exacta,
+    sino con una ventana amplia, y se usa la fecha como candado para que dos
+    ejecuciones del mismo dia no publiquen dos sets seguidos.
+
+    Devuelve (True, "") si toca, o (False, motivo).
+    """
     try:
-        from zoneinfo import ZoneInfo
-        from datetime import datetime
-        ahora = datetime.now(ZoneInfo("America/Santiago"))
+        ahora = ahora_en_chile()
     except Exception as e:                                   # sin tzdata
         print("Aviso: no se pudo leer la hora de Chile (%s). Se publica igual." % e)
-        return True
-    print("Hora en Santiago: %s" % ahora.strftime("%Y-%m-%d %H:%M %Z"))
-    return ahora.hour == objetivo
+        return True, ""
+
+    hoy = ahora.strftime("%Y-%m-%d")
+    dias = "lunes, martes, miercoles, jueves, viernes, sabado, domingo".split(", ")
+    print("Hora en Santiago: %s %s" % (ahora.strftime("%Y-%m-%d %H:%M %Z"), dias[ahora.weekday()]))
+
+    if estado.get("ultimo_dia_publicado") == hoy:
+        return False, "ya se publico hoy (%s)" % hoy
+    if ahora.weekday() not in DIAS_PUBLICACION:
+        return False, "hoy es %s; solo se publica lunes y miercoles" % dias[ahora.weekday()]
+    if ahora.hour < desde:
+        return False, "aun no son las %02d:00 en Chile" % desde
+    if ahora.hour >= hasta:
+        return False, "ya pasaron las %02d:00 en Chile, se deja para el proximo dia" % hasta
+    return True, ""
 
 
 def cmd_publicar(args):
-    if args.respetar_hora and not hora_chilena_correcta(args.hora):
-        print("No son las %d:00 en Chile. Esta ejecucion no publica." % args.hora)
-        return 0
-
     estado = cargar_estado()
+
+    if args.respetar_hora:
+        ok, motivo = toca_publicar(estado, args.desde, args.hasta)
+        if not ok:
+            print("Esta ejecucion no publica: %s" % motivo)
+            return 0
 
     if args.set:
         nombre = "set_%02d" % args.set
@@ -389,6 +421,10 @@ def cmd_publicar(args):
         entrada["media_id"] = media_id
         entrada["historia_media_id"] = historia_id
         entrada["publicado_en"] = time.strftime("%Y-%m-%dT%H:%M:%S%z")
+        try:
+            estado["ultimo_dia_publicado"] = ahora_en_chile().strftime("%Y-%m-%d")
+        except Exception:
+            pass
         guardar_estado(estado)
     return 0
 
@@ -403,8 +439,11 @@ def main():
     p.add_argument("--estado", action="store_true", help="muestra el calendario de publicacion")
     p.add_argument("--iniciar", action="store_true", help="crea estado.json desde cero")
     p.add_argument("--respetar-hora", action="store_true",
-                   help="solo publica si en Chile es la hora indicada (para el cron con horario de verano)")
-    p.add_argument("--hora", type=int, default=12, help="hora local de Chile en la que publicar (defecto 12)")
+                   help="solo publica si toca: dia correcto, dentro de la ventana y sin haber publicado hoy")
+    p.add_argument("--desde", type=int, default=VENTANA_DESDE,
+                   help="hora de Chile a partir de la cual se puede publicar (defecto %d)" % VENTANA_DESDE)
+    p.add_argument("--hasta", type=int, default=VENTANA_HASTA,
+                   help="hora de Chile hasta la cual se puede publicar (defecto %d)" % VENTANA_HASTA)
     args = p.parse_args()
 
     try:

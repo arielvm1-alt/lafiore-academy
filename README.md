@@ -177,10 +177,21 @@ python publicar.py --estado   # ver qué se publicó y qué falta
 `.github/workflows/publicar.yml` publica **un set los lunes y los miércoles a las
 12:00 de Chile**. Con 10 sets, eso cubre cinco semanas.
 
-Como Chile cambia de hora dos veces al año, el cron se lanza a las 15:00 y a
-las 16:00 UTC, y el script comprueba la hora real en Santiago: publica en la
-ejecución correcta e ignora la otra. No hay que tocar nada en marzo ni en
-septiembre.
+**Los cron de GitHub Actions no son puntuales.** En este repositorio se han
+medido retrasos de entre 8 minutos y más de 3 horas. Por eso el workflow no
+depende de una hora exacta:
+
+- Se lanzan **cuatro** ejecuciones repartidas por la tarde (14, 15, 17 y 19 UTC).
+- El script publica en la primera que caiga **entre las 12:00 y las 21:00 hora
+  de Chile**, comprobando la hora real en Santiago (así el cambio de hora de
+  marzo y septiembre no afecta).
+- Un **candado por fecha** en `estado.json` (`ultimo_dia_publicado`) impide que
+  las ejecuciones siguientes publiquen un segundo set el mismo día.
+
+Condicionar a una hora exacta fue el error de la primera versión: el 26 de
+agosto dos ejecuciones retrasadas cayeron dentro de las 12:xx y publicaron dos
+sets seguidos, y los tres días siguientes ninguna cayó en la hora justa, así
+que no se publicó nada.
 
 Para cambiar los días, edita las dos líneas `cron` del workflow: `1,3` son
 lunes y miércoles (0 = domingo). `1-5` serían todos los días laborables y `*`
